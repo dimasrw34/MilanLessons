@@ -1,5 +1,6 @@
 using DevHabit.Api.Database;
 using DevHabit.Api.DTOs.Habits;
+using DevHabit.Api.DTOs.HabitTags;
 using DevHabit.Api.Entities;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
@@ -27,12 +28,12 @@ public class HabitsController(ApplicationDbContext dbContext) : ControllerBase
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<HabitDto>> GetHabit(string id)
+    public async Task<ActionResult<HabitWithTagsDto>> GetHabit(string id)
     {
-        HabitDto? habit = await dbContext
+        HabitWithTagsDto? habit = await dbContext
             .Habits
             .Where(h => h.Id == id)
-            .Select(HabitQueries.ProjectToDto())
+            .Select(HabitQueries.ProjectToHabitWithTagsDto())
             .FirstOrDefaultAsync();
         if (habit is null)
         {

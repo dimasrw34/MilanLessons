@@ -1,8 +1,9 @@
+using DevHabit.Api.DTOs.Habits;
 using DevHabit.Api.Entities;
 
-namespace DevHabit.Api.DTOs.Habits;
+namespace DevHabit.Api.DTOs.HabitTags;
 
-public record HabitDto
+public sealed record HabitWithTagsDto
 {
     public required string Id { get; init; }
     public required string Name { get; init; }
@@ -17,4 +18,5 @@ public record HabitDto
     public required DateTime CreatedAtUtc { get; init; }
     public DateTime? UpdatedAtUtc { get; init; }
     public DateTime? LastComplitedAtUtc { get; init; }
+    public required string[] Tags { get; init; }
 }
