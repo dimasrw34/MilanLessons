@@ -51,13 +51,15 @@ public class HabitsController(ApplicationDbContext dbContext) : ControllerBase
         CreateHabitDto createHabitDto, 
         IValidator<CreateHabitDto> validator)
     {
-
-        ValidationResult validationResult = await validator.ValidateAsync(createHabitDto);
+        
+        //Закоментирован, так как используется ValidationHandler (middleware)
+        /*ValidationResult validationResult = await validator.ValidateAsync(createHabitDto);
 
         if (!validationResult.IsValid)
         {
             return BadRequest(validationResult.ToDictionary());
-        }
+        }*/
+        await validator.ValidateAndThrowAsync(createHabitDto);
 
         var habit = createHabitDto.ToEntity();
         dbContext.Habits.Add(habit);
