@@ -1,6 +1,8 @@
+using DevHabit.Api.DTOs.Common;
+
 namespace DevHabit.Api.DTOs.Habits;
 
-public sealed record HabitsCollectionDto
+public sealed record HabitsCollectionDto : ICollectionResponse<HabitDto>
 {
-    public List<HabitDto> Data { get; init; }
+    public required List<HabitDto> Items { get; init; }
 }

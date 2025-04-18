@@ -68,7 +68,7 @@ public class HabitsWithQueryController(ApplicationDbContext dbContext) : Control
 
         var habitsCollectionDto = new HabitsCollectionDto
         {
-            Data = habits
+            Items = habits
         };
         return Ok(habitsCollectionDto);
     }

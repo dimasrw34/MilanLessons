@@ -1,34 +1,75 @@
+using System.Linq.Dynamic.Core;
+using System.Linq.Expressions;
 using DevHabit.Api.Database;
+using DevHabit.Api.DTOs.Common;
 using DevHabit.Api.DTOs.Habits;
 using DevHabit.Api.DTOs.HabitTags;
 using DevHabit.Api.Entities;
+using DevHabit.Api.Services.Sorting;
 using FluentValidation;
-using FluentValidation.Results;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.MicrosoftExtensions;
 
 namespace DevHabit.Api.Controllers;
 
 [ApiController]
-[Route("habits")]
-public class HabitsController(ApplicationDbContext dbContext) : ControllerBase
+[Route("habits_p")]
+public class HabitsWithPaginationController(ApplicationDbContext dbContext) : ControllerBase
 {
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="query"></param>
+    /// <param name="sortMappingProvider"></param>
+    /// <returns></returns>
     [HttpGet]
-    public async Task<ActionResult<HabitsCollectionDto>> GetHabits()
+    public async Task<ActionResult<PaginationResult<HabitDto>>> GetHabits(
+        [FromQuery] HabitsQueryParameters query,
+        SortMappingProvider sortMappingProvider)
     {
-        List<HabitDto> habits = await dbContext
-            .Habits
-            .Select(HabitQueries.ProjectToDto())
-            .ToListAsync();
-
-        var habitsCollectionDto = new HabitsCollectionDto
+        if (!sortMappingProvider.ValidateMappings<HabitDto, Habit>(query.Sort))
         {
-            Items = habits
+            return Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                detail: $"The provider sort parameter isn't valid: {query.Sort}");
+        }
+
+        query.Search ??= query.Search?.Trim().ToLower();
+        
+        SortMapping[] sortMappings = sortMappingProvider.GetMappings<HabitDto, Habit>();
+         
+        Expression<Func<Habit, object>> orderBy = query.Sort switch
+        {
+            "name" => h => h.Name,
+            "description" => h => h.Description,
+            "type" => h => h.Type,
+            "status" => h => h.HabitStatus,
+            _ => h => h.Name
         };
-        return Ok(habitsCollectionDto);
+        
+        IQueryable<HabitDto> habitsQuery = dbContext
+            .Habits
+            .Where(h => query.Search == null ||
+                        h.Name.ToLower().Contains(query.Search) ||
+                        h.Description != null && h.Description.ToLower().Contains(query.Search))
+            .Where((h => query.Type == null || h.Type == query.Type))
+            .Where(h => query.Status == null || h.HabitStatus == query.Status)
+            .ApplySort(query.Sort, sortMappings)
+            .Select(HabitQueries.ProjectToDto());
+
+        var paginationResult = await PaginationResult<HabitDto>
+            .CreateAsync(habitsQuery, query.Page, query.PageSize);
+        
+        return Ok(paginationResult);
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
     [HttpGet("{id}")]
     public async Task<ActionResult<HabitWithTagsDto>> GetHabit(string id)
     {
@@ -45,20 +86,17 @@ public class HabitsController(ApplicationDbContext dbContext) : ControllerBase
         return Ok(habit);
     }
 
-
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="createHabitDto"></param>
+    /// <param name="validator"></param>
+    /// <returns></returns>
     [HttpPost]
     public async Task<ActionResult<HabitDto>> CreateHabit(
         CreateHabitDto createHabitDto, 
         IValidator<CreateHabitDto> validator)
     {
-        
-        //Закоментирован, так как используется ValidationHandler (middleware)
-        /*ValidationResult validationResult = await validator.ValidateAsync(createHabitDto);
-
-        if (!validationResult.IsValid)
-        {
-            return BadRequest(validationResult.ToDictionary());
-        }*/
         await validator.ValidateAndThrowAsync(createHabitDto);
 
         var habit = createHabitDto.ToEntity();
@@ -70,6 +108,12 @@ public class HabitsController(ApplicationDbContext dbContext) : ControllerBase
         return CreatedAtAction(nameof(GetHabit), new { id = habitDto.Id }, habitDto);
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="updateHabitDto"></param>
+    /// <returns></returns>
     [HttpPut("{id}")]
     public async Task<ActionResult> UpdateHabit(string id, UpdateHabitDto updateHabitDto)
     {
@@ -85,6 +129,12 @@ public class HabitsController(ApplicationDbContext dbContext) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="patchDocument"></param>
+    /// <returns></returns>
     [HttpPatch("{id}")]
     public async Task<ActionResult> PatchHabit(string id, JsonPatchDocument<HabitDto> patchDocument)
     {
@@ -110,6 +160,11 @@ public class HabitsController(ApplicationDbContext dbContext) : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteHabit(string id)
     {
