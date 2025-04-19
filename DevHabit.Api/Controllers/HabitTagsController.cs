@@ -1,6 +1,8 @@
+using System.Runtime.CompilerServices;
 using DevHabit.Api.Database;
 using DevHabit.Api.DTOs.HabitTags;
 using DevHabit.Api.Entities;
+using DevHabit.Api.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +16,10 @@ namespace DevHabit.Api.Controllers;
 [Route("habits/{habitId}/tags")]
 public sealed class HabitTagsController (ApplicationDbContext dbContext) : ControllerBase
 {
-
+    public static readonly string Name = nameof(HabitTagsController).Replace("Controller", string.Empty);
+    
+    
+    
     [HttpPut]
     public async Task<ActionResult> UpsertHabitTags(string habitId, UpsertHabitTagsDto upsertHabitTagsDto)
     {
