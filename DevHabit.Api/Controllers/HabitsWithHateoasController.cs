@@ -1,4 +1,5 @@
 using System.Dynamic;
+using Asp.Versioning;
 using DevHabit.Api.Database;
 using DevHabit.Api.DTOs.Common;
 using DevHabit.Api.DTOs.Habits;
@@ -15,6 +16,7 @@ namespace DevHabit.Api.Controllers;
 
 [ApiController]
 [Route("habits_h")]
+[ApiVersion(1.0)]
 public class HabitsWithHateoasController(ApplicationDbContext dbContext, LinkService linkService) : ControllerBase
 {
     /// <summary>
@@ -94,9 +96,11 @@ public class HabitsWithHateoasController(ApplicationDbContext dbContext, LinkSer
     /// </summary>
     /// <param name="id"></param>
     /// <param name="fields"></param>
+    /// <param name="accept"></param>
     /// <param name="dataShapingService"></param>
     /// <returns></returns>
     [HttpGet("{id}")]
+    [MapToApiVersion(1.0)]
     public async Task<IActionResult> GetHabit(
         string id, 
         string? fields,
@@ -296,6 +300,45 @@ public class HabitsWithHateoasController(ApplicationDbContext dbContext, LinkSer
                 HabitTagsController.Name)
         ];
         return links;
+    }
+    
+    [HttpGet("{id}")]
+    [ApiVersion(2.0)]
+    public async Task<IActionResult> GetHabitV2(
+        string id, 
+        string? fields,
+        [FromHeader(Name = "Accept")]
+        string? accept,
+        DataShapingService dataShapingService)
+    {        
+        
+        if (!dataShapingService.Validate<HabitDto>(fields))
+        {
+            return Problem(
+                statusCode: StatusCodes.Status400BadRequest,
+                detail: $"The provided data shaping fields aren't valid: {fields}");
+        }
+        
+        HabitWithTagsDtoV2? habit = await dbContext
+            .Habits
+            .Where(h => h.Id == id)
+            .Select(HabitQueries.ProjectToHabitWithTagsDtoV2())
+            .FirstOrDefaultAsync();
+        if (habit is null)
+        {
+            return NotFound();
+        }
+        
+        ExpandoObject shapedHabitDto = dataShapingService.ShapeData(habit, fields);
+
+        if (accept == CustomMediaTypeNames.Application.HateoasJson)
+        {
+            List<LinkDto> links = CreateLinksForHabit(id, fields);        
+            shapedHabitDto.TryAdd("links", links);
+        }
+
+        
+        return Ok(shapedHabitDto);
     }
 
 }
