@@ -64,22 +64,28 @@ public class HabitsWithHateoasController(ApplicationDbContext dbContext, LinkSer
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
             .ToListAsync();
+
+        bool includeLinks = query.accept == CustomMediaTypeNames.Application.HateoasJson;
         
         var paginationResult = new PaginationResult<ExpandoObject>
         {
             Items = dataShapingService.ShapeCollectionData(
                 habits, 
                 query.Fields, 
-                h =>CreateLinksForHabit(h.Id, query.Fields)),
+                includeLinks ? h => CreateLinksForHabit(h.Id, query.Fields) : null),
             Page = query.Page,
             PageSize = query.PageSize,
             TotalCount = totalCount
         };
-        paginationResult.Links = CreateLinksForHabit(
-            query, 
-            paginationResult.HasNextPage,
-            paginationResult.HasPreviousPage);
-        
+
+        if (includeLinks)
+        {
+            paginationResult.Links = CreateLinksForHabit(
+                query, 
+                paginationResult.HasNextPage,
+                paginationResult.HasPreviousPage);
+        }
+
         return Ok(paginationResult);
     }
 
@@ -94,6 +100,8 @@ public class HabitsWithHateoasController(ApplicationDbContext dbContext, LinkSer
     public async Task<IActionResult> GetHabit(
         string id, 
         string? fields,
+        [FromHeader(Name = "Accept")]
+        string? accept,
         DataShapingService dataShapingService)
     {        
         
@@ -116,8 +124,12 @@ public class HabitsWithHateoasController(ApplicationDbContext dbContext, LinkSer
         
         ExpandoObject shapedHabitDto = dataShapingService.ShapeData(habit, fields);
 
-        List<LinkDto> links = CreateLinksForHabit(id, fields);        
-        shapedHabitDto.TryAdd("links", links);
+        if (accept == CustomMediaTypeNames.Application.HateoasJson)
+        {
+            List<LinkDto> links = CreateLinksForHabit(id, fields);        
+            shapedHabitDto.TryAdd("links", links);
+        }
+
         
         return Ok(shapedHabitDto);
     }
